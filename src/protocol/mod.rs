@@ -1,0 +1,30 @@
+use std::io::Cursor;
+
+use crate::export_modules;
+
+export_modules!(
+    open_reply1,
+    open_reply2,
+    open_request2,
+    open_request1,
+    unconnected_pong,
+    unconnected_ping,
+	disconnect,
+	connection_request,
+    connection_accepted,
+	new_incoming,
+    incompatible_protocol
+);
+
+pub trait Packet {
+    const ID: u8;
+
+    fn deserialize(buffer: &mut Cursor<Vec<u8>>) -> Option<Self>
+    where
+        Self: Sized;
+    fn serialize(&self, buffer: &mut Vec<u8>);
+}
+
+pub const MAGIC: [u8; 16] = [
+    0x00, 0xFF, 0xFF, 0x00, 0xFE, 0xFE, 0xFE, 0xFE, 0xFD, 0xFD, 0xFD, 0xFD, 0x12, 0x34, 0x56, 0x78,
+];
