@@ -16,7 +16,7 @@ impl Packet for UnconnectedPong {
 
 	fn deserialize(buffer: &mut std::io::Cursor<Vec<u8>>) -> Option<Self> {
 		buffer.read_u8().unwrap();
-		let timestamp = Duration::from_secs(buffer.read_u32::<LittleEndian>().unwrap() as u64);
+		let timestamp = Duration::from_secs(buffer.read_u64::<LittleEndian>().unwrap() as u64);
 		let server_guid = buffer.read_u64::<LittleEndian>().unwrap();
 		buffer.seek_relative(MAGIC.len() as i64).unwrap(); // Skup Magic
 		let mut id = String::new();
