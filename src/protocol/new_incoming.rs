@@ -22,8 +22,8 @@ impl Packet for NewIncomingConnection {
 		for _ in 0..20 {
             internal_address.push(Address::deserialize(buffer)?);
         }
-		let incoming_timestamp = buffer.read_u64::<byteorder::LittleEndian>().unwrap();
-		let server_timestamp = buffer.read_u64::<byteorder::LittleEndian>().unwrap();
+		let incoming_timestamp = buffer.read_u64::<byteorder::BigEndian>().unwrap();
+		let server_timestamp = buffer.read_u64::<byteorder::BigEndian>().unwrap();
 
 		Some(NewIncomingConnection {
 			server_address,
@@ -40,7 +40,7 @@ impl Packet for NewIncomingConnection {
 		for address in &self.internal_address {
 			address.serialize(buffer);
 		}
-        buffer.write_u64::<byteorder::LittleEndian>(self.incoming_timestamp).unwrap();
-		buffer.write_u64::<byteorder::LittleEndian>(self.server_timestamp).unwrap();
+        buffer.write_u64::<byteorder::BigEndian>(self.incoming_timestamp).unwrap();
+		buffer.write_u64::<byteorder::BigEndian>(self.server_timestamp).unwrap();
 	}
 }

@@ -1,6 +1,6 @@
 use std::io::{Seek, Write};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::misc::Address;
 
@@ -18,9 +18,9 @@ impl Packet for OpenReply2 {
 
 	fn deserialize(buffer: &mut std::io::Cursor<Vec<u8>>) -> Option<Self> {
 		buffer.seek_relative(17).unwrap();
-		let server_guid = buffer.read_u64::<LittleEndian>().unwrap();
+		let server_guid = buffer.read_u64::<BigEndian>().unwrap();
 		let client_address = Address::deserialize(buffer)?;
-		let mtu = buffer.read_u16::<LittleEndian>().unwrap();
+		let mtu = buffer.read_u16::<BigEndian>().unwrap();
 		let encryption_enabled = buffer.read_u8().map(|b| b == 1).unwrap();
 
 		Some(OpenReply2 {
@@ -34,9 +34,9 @@ impl Packet for OpenReply2 {
 	fn serialize(&self, buffer: &mut Vec<u8>) {
 		buffer.write_u8(OpenReply2::ID).expect("Failed to write packet id.");
 		buffer.write(&MAGIC).unwrap();
-		buffer.write_u64::<LittleEndian>(self.server_guid).expect("Failed to write server_guid.");
+		buffer.write_u64::<BigEndian>(self.server_guid).expect("Failed to write server_guid.");
 		self.client_address.serialize(buffer);
-		buffer.write_u16::<LittleEndian>(self.mtu).expect("Failed to write mtu.");
+		buffer.write_u16::<BigEndian>(self.mtu).expect("Failed to write mtu.");
 		buffer.write_u8(self.encryption_enabled as u8).unwrap();
 	}
 }

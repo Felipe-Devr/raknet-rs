@@ -1,4 +1,4 @@
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 pub enum AddressVersion {
     IPv4,
@@ -25,13 +25,13 @@ impl Address {
 				for octate in octates {
 					buffer.write_u8(octate).unwrap();
 				}
-				buffer.write_u16::<LittleEndian>(self.port).unwrap();
+				buffer.write_u16::<BigEndian>(self.port).unwrap();
             }
             AddressVersion::IPv6 => {
                 buffer.write_u8(6).unwrap();
                 /*  buffer.write_u8(16).unwrap();
                 buffer.write_all(self.ip.as_bytes()).unwrap();
-                buffer.write_u16::<LittleEndian>(self.port).unwrap(); */
+                buffer.write_u16::<BigEndian>(self.port).unwrap(); */
             }
         }
     }
@@ -46,7 +46,7 @@ impl Address {
 				for _ in 0..3 {
 					octets.push(buffer.read_u8().unwrap());
 				}
-				let port = buffer.read_u16::<LittleEndian>().unwrap();
+				let port = buffer.read_u16::<BigEndian>().unwrap();
 				
 				Some(Address {
                     version: AddressVersion::IPv4,

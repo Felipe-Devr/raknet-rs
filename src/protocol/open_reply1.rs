@@ -1,6 +1,6 @@
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use super::{Packet, MAGIC};
 
@@ -23,7 +23,7 @@ impl Packet for OpenReply1 {
         let mut cookie: Option<i32> = None;
 
         if use_security {
-            cookie = Some(cursor.read_i32::<LittleEndian>().unwrap()); // Read cookie.
+            cookie = Some(cursor.read_i32::<BigEndian>().unwrap()); // Read cookie.
         }
         let mtu = cursor.read_u16::<BigEndian>().unwrap(); // Read MTU.
 
@@ -38,14 +38,14 @@ impl Packet for OpenReply1 {
     fn serialize(&self, buffer: &mut Vec<u8>) {
         buffer.write_u8(OpenReply1::ID).unwrap(); // Write Packet id
         buffer.write(&MAGIC).unwrap(); // Write MAGIC
-        buffer.write_u64::<LittleEndian>(self.server_guid).unwrap(); // Write server guid
+        buffer.write_u64::<BigEndian>(self.server_guid).unwrap(); // Write server guid
 
         if self.use_security.is_some() {
             buffer.write_u8(1).unwrap(); // Write use security flag
             buffer
-                .write_i32::<LittleEndian>(self.cookie.unwrap())
+                .write_i32::<BigEndian>(self.cookie.unwrap())
                 .unwrap(); // Write Cookie
         }
-        buffer.write_u16::<LittleEndian>(self.mtu).unwrap(); // Write MTU
+        buffer.write_u16::<BigEndian>(self.mtu).unwrap(); // Write MTU
     }
 }

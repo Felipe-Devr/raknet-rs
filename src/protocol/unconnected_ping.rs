@@ -1,6 +1,6 @@
 use std::{io::{Seek, Write}, time::Duration};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use super::{Packet, MAGIC};
 
@@ -14,16 +14,16 @@ impl Packet for UnconnectedPing {
 
 	fn serialize(&self, buffer: &mut Vec<u8>) {
 		buffer.write_u8(UnconnectedPing::ID).expect("Failed to write packet id.");
-		buffer.write_u64::<LittleEndian>(self.timestamp.as_secs()).expect("Failed to write timestamp");
+		buffer.write_u64::<BigEndian>(self.timestamp.as_millis() as u64).expect("Failed to write timestamp");
 		buffer.write(&MAGIC).expect("Failed to write magic.");
-		buffer.write_u64::<LittleEndian>(self.guid).expect("Failed to write guid");
+		buffer.write_u64::<BigEndian>(self.guid).expect("Failed to write guid");
 	}
 
 	fn deserialize(buffer: &mut std::io::Cursor<Vec<u8>>) -> Option<Self>  {
 		buffer.read_u8().unwrap(); // Skip packet id.
-		let timestamp: Duration = Duration::from_secs(buffer.read_u64::<LittleEndian>().unwrap());
+		let timestamp: Duration = Duration::from_secs(buffer.read_u64::<BigEndian>().unwrap());
 		buffer.seek_relative(16).unwrap(); // Skip MAGIC.
-		let guid: u64 = buffer.read_u64::<LittleEndian>().unwrap();
+		let guid: u64 = buffer.read_u64::<BigEndian>().unwrap();
 
 		Some(UnconnectedPing { timestamp, guid })
 	}

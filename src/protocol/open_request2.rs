@@ -1,6 +1,6 @@
 use std::io::{Seek, SeekFrom, Write};
 
-use byteorder::{LittleEndian, WriteBytesExt};
+use byteorder::{BigEndian, WriteBytesExt};
 
 use crate::misc::Address;
 
@@ -30,10 +30,10 @@ impl Packet for OpenRequest2 {
 		self.address.serialize(buffer);
 
 		if self.cookie.is_some() {
-			buffer.write_i32::<LittleEndian>(self.cookie.unwrap()).unwrap();
+			buffer.write_i32::<BigEndian>(self.cookie.unwrap()).unwrap();
 		}
 		buffer.write_u8(0).unwrap(); // Supports security.
-		buffer.write_u16::<LittleEndian>(self.mtu).unwrap();
-		buffer.write_i64::<LittleEndian>(self.client_guid).unwrap();
+		buffer.write_u16::<BigEndian>(self.mtu).unwrap();
+		buffer.write_i64::<BigEndian>(self.client_guid).unwrap();
 	}
 }

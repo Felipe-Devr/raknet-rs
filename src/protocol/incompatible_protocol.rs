@@ -1,6 +1,6 @@
 use std::io::{Seek, Write};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use super::{Packet, MAGIC};
 
@@ -16,7 +16,7 @@ impl Packet for IncompatibleProtocol {
 		buffer.read_u8().expect("Failed to read packet id.");
 		let protocol = buffer.read_u8().unwrap();
 		buffer.seek_relative(MAGIC.len() as i64).unwrap(); // Skip magic bytes.
-		let server_guid = buffer.read_u64::<LittleEndian>().unwrap();
+		let server_guid = buffer.read_u64::<BigEndian>().unwrap();
 
 		Some(IncompatibleProtocol { protocol, server_guid })
 	}
@@ -25,6 +25,6 @@ impl Packet for IncompatibleProtocol {
 		buffer.write_u8(IncompatibleProtocol::ID).expect("Failed to write packet id.");
 		buffer.write_u8(self.protocol).expect("Failed to write protocol version.");
 		buffer.write(&MAGIC).expect("Failed to write packet MAGIC.");
-		buffer.write_u64::<LittleEndian>(self.server_guid).expect("Failed to write server GUID.");
+		buffer.write_u64::<BigEndian>(self.server_guid).expect("Failed to write server GUID.");
 	}
 }

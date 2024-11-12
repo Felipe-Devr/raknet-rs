@@ -1,4 +1,4 @@
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::misc::{Address, AddressVersion};
 
@@ -23,8 +23,8 @@ impl Packet for ConnectionRequestAccepted {
 		for _ in 0..9 {
 			Address::deserialize(buffer);
 		}
-        let request_time = buffer.read_u64::<LittleEndian>().unwrap();
-		let time = buffer.read_u64::<LittleEndian>().unwrap();
+        let request_time = buffer.read_u64::<BigEndian>().unwrap();
+		let time = buffer.read_u64::<BigEndian>().unwrap();
 
 		Some(ConnectionRequestAccepted {
             client_address,
@@ -36,7 +36,7 @@ impl Packet for ConnectionRequestAccepted {
 	fn serialize(&self, buffer: &mut Vec<u8>) {
 		buffer.write_u8(ConnectionRequestAccepted::ID).expect("Failed to write packet id.");
 		self.client_address.serialize(buffer);
-		buffer.write_u16::<LittleEndian>(0).unwrap();
+		buffer.write_u16::<BigEndian>(0).unwrap();
 
 		// Unknown use, works with this ip.
 		let address = Address {
@@ -50,7 +50,7 @@ impl Packet for ConnectionRequestAccepted {
 			address.serialize(buffer);
 		}
 
-		buffer.write_u64::<LittleEndian>(self.request_time).unwrap();
-        buffer.write_u64::<LittleEndian>(self.time).unwrap();
+		buffer.write_u64::<BigEndian>(self.request_time).unwrap();
+        buffer.write_u64::<BigEndian>(self.time).unwrap();
 	}
 }
