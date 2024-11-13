@@ -1,56 +1,165 @@
-use std::{fmt::Error, io::Cursor, net::SocketAddr, time::UNIX_EPOCH};
+use std::{fmt::Error, net::SocketAddr, time::UNIX_EPOCH};
 
-use byteorder::ReadBytesExt;
 use tokio::net::UdpSocket;
 
-use crate::protocol::{Packet, UnconnectedPing, UnconnectedPong};
+use crate::{
+    misc::{Address, BinaryStream},
+    protocol::{
+        ConnectionRequest, ConnectionRequestAccepted, FrameSetPacket, OpenReply1, OpenReply2, OpenRequest1, OpenRequest2, Packet, UnconnectedPing, UnconnectedPong
+    },
+};
+
+use super::RakNetConnection;
+
 
 pub struct RakNetConfiguration {
-	pub address: SocketAddr
+    pub address: SocketAddr,
+    pub motd1: String,
+    pub motd2: String,
+    pub max_players: i32,
 }
 
-pub struct RakNetServer {
-	pub address: SocketAddr,
-    pub connections: Vec<u8>,
+pub struct RakNetServer <'a> {
+    pub address: SocketAddr,
     pub socket: UdpSocket,
-    pub guid: u64
+    pub guid: u64,
+    pub pong: String,
+    pub connections: Vec<&'a RakNetConnection<'a>>
 }
 
-impl RakNetServer {
-	pub async fn new(configuration: RakNetConfiguration) -> RakNetServer {
-        let socket = UdpSocket::bind(configuration.address).await.expect("Failed to create server socket");
+impl <'a> RakNetServer <'a> {
+    pub async fn new(configuration: RakNetConfiguration) -> RakNetServer <'a> {
 
-		RakNetServer {
-			address: configuration.address,
+        let socket = UdpSocket::bind(configuration.address)
+            .await
+            .expect("Failed to create server socket");
+        let port = configuration.address.port();
+        let guid = 3242348208447;
+
+        RakNetServer {
+            address: configuration.address,
             connections: Vec::new(),
             socket,
-            guid: 3242348208447
-		}
+            pong: format!(
+                "MCPE;{};100;1.0.0;{};{};{};{};Survival;1;{};{};",
+                configuration.motd1,
+                5,
+                configuration.max_players,
+                configuration.motd2,
+                guid,
+                port,
+                port + 1
+            ),
+            guid,
+        }
     }
 
-	pub async fn listen(&self) -> Result<bool, Error> {
-		println!("Server listening on port {}\n", self.address.port());
-		loop {
-			let mut buffer = [0; 4096];
-            let (_, peer_addr) = self.socket.recv_from(&mut buffer).await.unwrap();
-			let mut cursor = Cursor::new(Vec::from(buffer));
-			let packet_id = cursor.read_u8().expect("Failled to read packet id.");
+    pub async fn listen(&self) -> Result<bool, Error> {
+        println!("Server listening on port {}\n", self.address.port());
 
-			println!("Received packet with ID: {} from {}", packet_id, peer_addr);
+        loop {
+            let mut buffer: [u8; 4096] = [0; 4096];
+            let (size, peer_addr) = self.socket.recv_from(&mut buffer).await.unwrap();
+            let mut buf = buffer.to_vec();
+            buf.resize(size, 0x00);
 
-			if packet_id == UnconnectedPing::ID {
-				let response = UnconnectedPong {
-					id: String::from("MCPE;Rustified!;100;1.0.0;0;10;3242348208447;Rust Raknet;Survival;1;19142;19143;"),
-					timestamp: std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-                    server_guid: self.guid
-				};
+            let mut stream = BinaryStream::new(Some(buf));
+            let packet_id = stream.read_u8().expect("Failled to read packet id.");
 
-				println!("{:?}", response);
-				let mut response_buf: Vec<u8> = Vec::new();
-                response.serialize(&mut response_buf);
-                self.socket.send_to(&response_buf, peer_addr).await.expect("Failed to send response");
-			}
-		}
-	}
+            println!("Received packet with ID: {} from {} with size: {}", packet_id, peer_addr, size);
+
+            match packet_id {
+                UnconnectedPing::ID => {
+                    self.handle_unconnected_ping(&peer_addr).await;
+                }
+
+                OpenRequest1::ID => {
+                    let deserialized = OpenRequest1::deserialize(&mut stream)
+                        .expect("Failed to deserialize OpenRequest1");
+
+                    let response = OpenReply1 {
+                        use_security: false,
+                        server_guid: self.guid,
+                        cookie: None,
+                        mtu: deserialized.mtu,
+                    };
+
+                    let mut response_buf: BinaryStream = BinaryStream::new(None);
+                    response.serialize(&mut response_buf);
+                    println!("{:?}", response_buf.buffer);
+                    self.socket
+                        .send_to(&response_buf.buffer, &peer_addr)
+                        .await
+                        .expect("Failed to send response");
+                }
+
+                OpenRequest2::ID => {
+                    let deserialized = OpenRequest2::deserialize(&mut stream)
+                        .expect("Failed to deserialize OpenRequest2");
+                    
+                    let response = OpenReply2 {
+                        server_guid: self.guid,
+                        mtu: deserialized.mtu,
+                        client_address: Address::from(&peer_addr),
+                        encryption_enabled: false,
+                    };
+
+                    let mut response_buf: BinaryStream = BinaryStream::new(None);
+                    response.serialize(&mut response_buf);
+                    self.socket
+                        .send_to(&response_buf.buffer, &peer_addr)
+                        .await
+                        .expect("Failed to send response");
+
+                }
+
+				ConnectionRequest::ID => {
+					let deserialized = ConnectionRequest::deserialize(&mut stream)
+                        .expect("Failed to deserialize ConnectionRequest");
+
+					let response = ConnectionRequestAccepted {
+						time: std::time::SystemTime::now()
+						.duration_since(UNIX_EPOCH)
+						.unwrap(),
+						client_address: Address::from(&peer_addr),
+                        request_time: deserialized.timestamp,
+					};
+
+                    // TODO: Add Stablished connections to 
+                    
+                    /* let connection = RakNetConnection::new(peer_addr, &self.socket); */
+
+					let mut response_buf: BinaryStream = BinaryStream::new(None);
+                    response.serialize(&mut response_buf);
+                    self.socket
+                        .send_to(&response_buf.buffer, &peer_addr)
+                        .await
+                        .expect("Failed to send response");
+				}
+
+				0x80..0x8d => {
+                    FrameSetPacket::deserialize(&mut stream);
+                    println!("Unhandled packet ID: 0x{:02x}", packet_id);
+                   
+                }
+
+                _ => {
+                    println!("Unknown packet ID: 0x{:02x}", packet_id);
+                }
+            }
+        }
+    }
+
+    pub async fn handle_unconnected_ping(&self, address: &SocketAddr) {
+        let response = UnconnectedPong {
+            id: self.pong.clone(),
+            timestamp: std::time::SystemTime::now()
+               .duration_since(UNIX_EPOCH)
+               .unwrap(),
+            server_guid: self.guid,
+        };
+        let mut stream = BinaryStream::new(None);
+        response.serialize(&mut stream);
+        self.socket.send_to(&stream.buffer, address).await.expect("Failed to send response");
+    }
 }
-
