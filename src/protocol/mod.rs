@@ -14,7 +14,7 @@ export_modules!(
     connection_accepted,
 	new_incoming,
     incompatible_protocol,
-    frame
+    frame_set
 );
 
 pub trait Packet {
