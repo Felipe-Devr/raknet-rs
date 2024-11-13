@@ -1,7 +1,5 @@
-use std::{io::{Read, Seek, Write}, time::Duration};
-
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-
+use std::time::Duration;
+use crate::misc::{BinaryStream, Endianness};
 use super::{Packet, MAGIC};
 
 #[derive(Debug)]
@@ -14,15 +12,12 @@ pub struct UnconnectedPong {
 impl Packet for UnconnectedPong {
 	const ID: u8 = 0x1c;
 
-	fn deserialize(buffer: &mut std::io::Cursor<Vec<u8>>) -> Option<Self> {
-		buffer.read_u8().unwrap();
-		let timestamp = Duration::from_secs(buffer.read_u64::<BigEndian>().unwrap() as u64);
-		let server_guid = buffer.read_u64::<BigEndian>().unwrap();
-		buffer.seek_relative(MAGIC.len() as i64).unwrap(); // Skup Magic
-		buffer.read_u16::<BigEndian>().expect("Failed to read server identity string.");
-		let mut id = String::new();
-
-		buffer.read_to_string(&mut id).expect("Failed to read server identity");
+	fn deserialize(buffer: &mut BinaryStream) -> Option<Self> {
+		let timestamp = Duration::from_secs(buffer.read_u64(Endianness::BigEndian).unwrap() as u64);
+		let server_guid = buffer.read_u64(Endianness::BigEndian).unwrap();
+		buffer.advance(MAGIC.len()); // Skip Magic
+		buffer.read_u16(Endianness::BigEndian).expect("Failed to read server identity string.");
+		let id = buffer.read_string().unwrap();
 
 		Some(UnconnectedPong {
 			timestamp,
@@ -31,12 +26,11 @@ impl Packet for UnconnectedPong {
 		})
 	}
 
-	fn serialize(&self, buffer: &mut Vec<u8>) {
-		buffer.write_u8(UnconnectedPong::ID).expect("Failed to write packet id");
-		buffer.write_u64::<BigEndian>(self.timestamp.as_millis() as u64).expect("Failed to write timestamp.");
-		buffer.write_u64::<BigEndian>(self.server_guid).expect("Failed to write server guid.");
-		buffer.write(&MAGIC).unwrap();
-		buffer.write_u16::<BigEndian>(self.id.len() as u16).unwrap();
-		buffer.extend_from_slice(self.id.as_bytes());
+	fn serialize(&self, buffer: &mut BinaryStream) {
+		buffer.write_u8(UnconnectedPong::ID);
+		buffer.write_u64(self.timestamp.as_millis() as u64, Endianness::BigEndian);
+		buffer.write_u64(self.server_guid, Endianness::BigEndian);
+		buffer.write(&MAGIC);
+		buffer.write_string(self.id.as_str());
 	}
 }

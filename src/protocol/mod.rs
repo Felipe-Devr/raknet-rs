@@ -1,6 +1,6 @@
-use std::io::Cursor;
 
-use crate::export_modules;
+
+use crate::{export_modules, misc::BinaryStream};
 
 export_modules!(
     open_reply1,
@@ -13,16 +13,17 @@ export_modules!(
 	connection_request,
     connection_accepted,
 	new_incoming,
-    incompatible_protocol
+    incompatible_protocol,
+    frame
 );
 
 pub trait Packet {
     const ID: u8;
 
-    fn deserialize(buffer: &mut Cursor<Vec<u8>>) -> Option<Self>
+    fn deserialize(buffer: &mut BinaryStream) -> Option<Self>
     where
         Self: Sized;
-    fn serialize(&self, buffer: &mut Vec<u8>);
+    fn serialize(&self, buffer: &mut BinaryStream);
 }
 
 pub const MAGIC: [u8; 16] = [

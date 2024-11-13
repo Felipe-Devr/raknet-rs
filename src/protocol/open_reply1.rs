@@ -1,13 +1,11 @@
-use std::io::{Cursor, Seek, SeekFrom, Write};
-
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use crate::misc::{BinaryStream, Endianness};
 
 use super::{Packet, MAGIC};
 
 #[derive(Debug)]
 pub struct OpenReply1 {
     pub server_guid: u64,
-    pub use_security: Option<bool>,
+    pub use_security: bool,
     pub cookie: Option<i32>,
     pub mtu: u16,
 }
@@ -15,37 +13,36 @@ pub struct OpenReply1 {
 impl Packet for OpenReply1 {
     const ID: u8 = 0x06;
 
-    fn deserialize(cursor: &mut Cursor<Vec<u8>>) -> Option<Self> {
-        cursor.seek(SeekFrom::Current(17)).unwrap(); // Skip Packet ID and MAGIC
+    fn deserialize(stream: &mut BinaryStream) -> Option<Self> {
+        stream.advance(16); // Skip Packet MAGIC
 
-        let server_guid = cursor.read_u64::<BigEndian>().unwrap(); // Read server guid
-        let use_security = cursor.read_u8().map(|b| b == 1).unwrap(); // Read use security
+        let server_guid = stream.read_u64(Endianness::BigEndian).unwrap(); // Read server guid
+        let use_security = stream.read_bool().unwrap(); // Read use security
         let mut cookie: Option<i32> = None;
 
         if use_security {
-            cookie = Some(cursor.read_i32::<BigEndian>().unwrap()); // Read cookie.
+            cookie = Some(stream.read_i32(Endianness::BigEndian).unwrap()); // Read cookie.
         }
-        let mtu = cursor.read_u16::<BigEndian>().unwrap(); // Read MTU.
+        let mtu = stream.read_u16(Endianness::BigEndian).unwrap(); // Read MTU.
 
         Some(OpenReply1 {
             server_guid,
-            use_security: Some(use_security),
+            use_security,
             cookie,
             mtu,
         })
     }
 
-    fn serialize(&self, buffer: &mut Vec<u8>) {
-        buffer.write_u8(OpenReply1::ID).unwrap(); // Write Packet id
-        buffer.write(&MAGIC).unwrap(); // Write MAGIC
-        buffer.write_u64::<BigEndian>(self.server_guid).unwrap(); // Write server guid
+    fn serialize(&self, buffer: &mut BinaryStream) {
+        buffer.write_u8(OpenReply1::ID); // Write Packet id
+        buffer.write(&MAGIC); // Write MAGIC
+        buffer.write_u64(self.server_guid, Endianness::BigEndian); // Write server guid
 
-        if self.use_security.is_some() {
-            buffer.write_u8(1).unwrap(); // Write use security flag
+        buffer.write_bool(self.use_security); // Write use security flag
+        if self.use_security {
             buffer
-                .write_i32::<BigEndian>(self.cookie.unwrap())
-                .unwrap(); // Write Cookie
+                .write_i32(self.cookie.unwrap(), Endianness::BigEndian); // Write cookie
         }
-        buffer.write_u16::<BigEndian>(self.mtu).unwrap(); // Write MTU
+        buffer.write_u16(self.mtu, Endianness::BigEndian); // Write MTU
     }
 }

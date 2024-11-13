@@ -1,27 +1,25 @@
-use std::io::{Seek, Write};
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::misc::Address;
+use crate::misc::{BinaryStream, Address, Endianness};
 
 use super::{Packet, MAGIC};
 
 pub struct OpenReply2 {
-	server_guid: u64,
-	client_address: Address,
-	mtu: u16,
-	encryption_enabled: bool
+	pub server_guid: u64,
+	pub client_address: Address,
+	pub mtu: u16,
+	pub encryption_enabled: bool
 }
 
 impl Packet for OpenReply2 {
 	const ID: u8 = 0x08;
 
-	fn deserialize(buffer: &mut std::io::Cursor<Vec<u8>>) -> Option<Self> {
-		buffer.seek_relative(17).unwrap();
-		let server_guid = buffer.read_u64::<BigEndian>().unwrap();
+	fn deserialize(buffer: &mut BinaryStream) -> Option<Self> {
+		buffer.advance(16);
+		let server_guid = buffer.read_u64(Endianness::BigEndian).unwrap();
 		let client_address = Address::deserialize(buffer)?;
-		let mtu = buffer.read_u16::<BigEndian>().unwrap();
-		let encryption_enabled = buffer.read_u8().map(|b| b == 1).unwrap();
+		let mtu = buffer.read_u16(Endianness::BigEndian).unwrap();
+		let encryption_enabled = buffer.read_bool().unwrap();
 
 		Some(OpenReply2 {
             server_guid,
@@ -31,12 +29,12 @@ impl Packet for OpenReply2 {
         })
 	}
 
-	fn serialize(&self, buffer: &mut Vec<u8>) {
-		buffer.write_u8(OpenReply2::ID).expect("Failed to write packet id.");
-		buffer.write(&MAGIC).unwrap();
-		buffer.write_u64::<BigEndian>(self.server_guid).expect("Failed to write server_guid.");
+	fn serialize(&self, buffer: &mut BinaryStream) {
+		buffer.write_u8(OpenReply2::ID);
+		buffer.write(&MAGIC);
+		buffer.write_u64(self.server_guid, Endianness::BigEndian);
 		self.client_address.serialize(buffer);
-		buffer.write_u16::<BigEndian>(self.mtu).expect("Failed to write mtu.");
-		buffer.write_u8(self.encryption_enabled as u8).unwrap();
+		buffer.write_u16(self.mtu, Endianness::BigEndian);
+		buffer.write_bool(self.encryption_enabled);
 	}
 }

@@ -1,39 +1,49 @@
-use std::io::{Seek, SeekFrom, Write};
 
-use byteorder::{BigEndian, WriteBytesExt};
 
-use crate::misc::Address;
+use crate::misc::{Address, BinaryStream, Endianness};
 
 use super::{Packet, MAGIC};
 
 pub struct OpenRequest2 {
 	pub address: Address,
 	pub cookie: Option<i32>,
-	pub supports_security: bool,
+	pub supports_security: Option<bool>,
 	pub mtu: u16,
-	pub client_guid: i64
+	pub client_guid: u64
 }
 
 impl Packet for OpenRequest2 {
 	const ID: u8 = 0x07;
 
-	fn deserialize(buffer: &mut std::io::Cursor<Vec<u8>>) -> Option<Self> {
-		buffer.seek(SeekFrom::Current(17)).unwrap();
+	// TODO: Implement cookie and security
+	fn deserialize(buffer: &mut BinaryStream) -> Option<Self> {
+		buffer.advance(MAGIC.len());
+		let address = Address::deserialize(buffer).unwrap();
+		/* let cookie = buffer.read_i32(Endianness::BigEndian).unwrap(); */
+		/* let supports_security = buffer.read_bool().unwrap(); */
+		let mtu = buffer.read_u16(Endianness::BigEndian).unwrap();
+		let client_guid = buffer.read_u64(Endianness::BigEndian).unwrap();
 
-		None
+		Some(OpenRequest2 {
+            address,
+            cookie: None,
+            supports_security: None,
+            mtu,
+            client_guid
+        })
 	}
 
-	fn serialize(&self, buffer: &mut Vec<u8>) {
-		buffer.write_u8(OpenRequest2::ID).unwrap();
-		buffer.write(&MAGIC).unwrap();
+	fn serialize(&self, buffer: &mut BinaryStream) {
+		buffer.write_u8(OpenRequest2::ID);
+		buffer.write(&MAGIC);
 		
 		self.address.serialize(buffer);
 
 		if self.cookie.is_some() {
-			buffer.write_i32::<BigEndian>(self.cookie.unwrap()).unwrap();
+			buffer.write_i32(self.cookie.unwrap(), Endianness::BigEndian);
 		}
-		buffer.write_u8(0).unwrap(); // Supports security.
-		buffer.write_u16::<BigEndian>(self.mtu).unwrap();
-		buffer.write_i64::<BigEndian>(self.client_guid).unwrap();
+		buffer.write_bool(self.supports_security.unwrap()); // Supports security.
+		buffer.write_u16(self.mtu, Endianness::BigEndian);
+		buffer.write_u64(self.client_guid, Endianness::BigEndian);
 	}
 }
