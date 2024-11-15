@@ -1,6 +1,6 @@
 
 use crate::misc::{Address, BinaryStream, Endianness};
-use super::Packet;
+use super::FramePacket;
 
 pub struct NewIncomingConnection {
 	pub server_address: Address,
@@ -9,7 +9,7 @@ pub struct NewIncomingConnection {
 	pub server_timestamp: u64
 }
 
-impl Packet for NewIncomingConnection {
+impl FramePacket for NewIncomingConnection {
 	const ID: u8 = 0x13;
 
 	fn deserialize(buffer: &mut BinaryStream) -> Option<Self> {

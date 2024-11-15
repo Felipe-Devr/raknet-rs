@@ -1,4 +1,4 @@
-use super::Packet;
+use super::FramePacket;
 use crate::misc::{Address, AddressVersion, BinaryStream, Endianness};
 use std::time::Duration;
 
@@ -8,14 +8,14 @@ pub struct ConnectionRequestAccepted {
     pub time: Duration,
 }
 
-impl Packet for ConnectionRequestAccepted {
+impl FramePacket for ConnectionRequestAccepted {
     const ID: u8 = 0x10;
 
     fn deserialize(buffer: &mut BinaryStream) -> Option<Self> {
         let client_address = Address::deserialize(buffer)?;
         buffer.read_u8().unwrap();
 
-        for _ in 0..9 {
+        for _ in 0..10 {
             Address::deserialize(buffer);
         }
         let request_time = Duration::from_millis(buffer.read_u64(Endianness::BigEndian).unwrap());

@@ -10,10 +10,8 @@ export_modules!(
     unconnected_pong,
     unconnected_ping,
 	disconnect,
-	connection_request,
-    connection_accepted,
-	new_incoming,
     incompatible_protocol,
+    connected,
     frame_set
 );
 

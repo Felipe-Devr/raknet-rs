@@ -56,6 +56,7 @@ impl Reliability {
     }
 }
 
+#[derive(Debug)]
 pub struct FrameSetPacket {
 	pub sequence: u32,
     pub frames: Vec<Frame>,  // Assuming Frame is defined elsewhere

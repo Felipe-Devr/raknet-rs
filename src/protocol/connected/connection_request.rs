@@ -1,5 +1,5 @@
 use std::time::Duration;
-use super::Packet;
+use super::FramePacket;
 use crate::misc::{BinaryStream, Endianness};
 
 pub struct ConnectionRequest {
@@ -8,10 +8,10 @@ pub struct ConnectionRequest {
 	pub use_security: bool
 }
 
-impl Packet for ConnectionRequest {
+impl FramePacket for ConnectionRequest {
 	const ID: u8 = 0x09;
 
-	fn deserialize(buffer: &mut BinaryStream) -> Option<Self> {
+	fn deserialize(buffer: &mut BinaryStream) -> Option<ConnectionRequest> {
 		let guid = buffer.read_u64(Endianness::BigEndian).unwrap();
 		let timestamp = Duration::from_secs(buffer.read_u64(Endianness::BigEndian).unwrap());
 		let use_security = buffer.read_bool().unwrap();
