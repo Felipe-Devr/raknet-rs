@@ -1,16 +1,16 @@
-use std::{fmt::Error, net::SocketAddr, time::UNIX_EPOCH};
+use std::{collections::HashMap, fmt::Error, net::SocketAddr, time::UNIX_EPOCH};
 
 use tokio::net::UdpSocket;
 
 use crate::{
     misc::{Address, BinaryStream},
     protocol::{
-        ConnectionRequest, ConnectionRequestAccepted, FrameSetPacket, OpenReply1, OpenReply2, OpenRequest1, OpenRequest2, Packet, UnconnectedPing, UnconnectedPong
+        /* ConnectionRequest, ConnectionRequestAccepted, FrameSetPacket, */ OpenReply1,
+        OpenReply2, OpenRequest1, OpenRequest2, Packet, UnconnectedPing, UnconnectedPong,
     },
 };
 
 use super::RakNetConnection;
-
 
 pub struct RakNetConfiguration {
     pub address: SocketAddr,
@@ -19,17 +19,16 @@ pub struct RakNetConfiguration {
     pub max_players: i32,
 }
 
-pub struct RakNetServer <'a> {
+pub struct RakNetServer<'a> {
     pub address: SocketAddr,
     pub socket: UdpSocket,
     pub guid: u64,
     pub pong: String,
-    pub connections: Vec<&'a RakNetConnection<'a>>
+    pub connections: HashMap<SocketAddr, RakNetConnection<'a>>,
 }
 
-impl <'a> RakNetServer <'a> {
-    pub async fn new(configuration: RakNetConfiguration) -> RakNetServer <'a> {
-
+impl<'a> RakNetServer<'a> {
+    pub async fn new(configuration: RakNetConfiguration) -> RakNetServer<'a> {
         let socket = UdpSocket::bind(configuration.address)
             .await
             .expect("Failed to create server socket");
@@ -38,7 +37,7 @@ impl <'a> RakNetServer <'a> {
 
         RakNetServer {
             address: configuration.address,
-            connections: Vec::new(),
+            connections: HashMap::new(),
             socket,
             pong: format!(
                 "MCPE;{};100;1.0.0;{};{};{};{};Survival;1;{};{};",
@@ -54,11 +53,11 @@ impl <'a> RakNetServer <'a> {
         }
     }
 
-    pub async fn listen(&self) -> Result<bool, Error> {
+    pub async fn listen(&'a mut self) -> Result<bool, Error> {
         println!("Server listening on port {}\n", self.address.port());
 
         loop {
-            let mut buffer: [u8; 4096] = [0; 4096];
+            let mut buffer: [u8; 2048] = [0; 2048];
             let (size, peer_addr) = self.socket.recv_from(&mut buffer).await.unwrap();
             let mut buf = buffer.to_vec();
             buf.resize(size, 0x00);
@@ -66,11 +65,21 @@ impl <'a> RakNetServer <'a> {
             let mut stream = BinaryStream::new(Some(buf));
             let packet_id = stream.read_u8().expect("Failled to read packet id.");
 
-            println!("Received packet with ID: {} from {} with size: {}", packet_id, peer_addr, size);
+            println!(
+                "Received packet with ID: {} from {} with size: {}",
+                packet_id, peer_addr, size
+            );
 
             match packet_id {
                 UnconnectedPing::ID => {
-                    self.handle_unconnected_ping(&peer_addr).await;
+                    let response = UnconnectedPong {
+                        id: self.pong.clone(),
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap(),
+                        server_guid: self.guid,
+                    };
+                    self.send(&peer_addr, response).await;
                 }
 
                 OpenRequest1::ID => {
@@ -84,19 +93,13 @@ impl <'a> RakNetServer <'a> {
                         mtu: deserialized.mtu,
                     };
 
-                    let mut response_buf: BinaryStream = BinaryStream::new(None);
-                    response.serialize(&mut response_buf);
-                    println!("{:?}", response_buf.buffer);
-                    self.socket
-                        .send_to(&response_buf.buffer, &peer_addr)
-                        .await
-                        .expect("Failed to send response");
+                    self.send(&peer_addr, response).await;
                 }
 
                 OpenRequest2::ID => {
                     let deserialized = OpenRequest2::deserialize(&mut stream)
                         .expect("Failed to deserialize OpenRequest2");
-                    
+
                     let response = OpenReply2 {
                         server_guid: self.guid,
                         mtu: deserialized.mtu,
@@ -104,43 +107,21 @@ impl <'a> RakNetServer <'a> {
                         encryption_enabled: false,
                     };
 
-                    let mut response_buf: BinaryStream = BinaryStream::new(None);
-                    response.serialize(&mut response_buf);
-                    self.socket
-                        .send_to(&response_buf.buffer, &peer_addr)
-                        .await
-                        .expect("Failed to send response");
+                    let connection =
+                        RakNetConnection::new(peer_addr, deserialized.mtu, &self.socket);
 
+                    self.connections.insert(peer_addr, connection);
+                    self.send(&peer_addr, response).await;
                 }
 
-				ConnectionRequest::ID => {
-					let deserialized = ConnectionRequest::deserialize(&mut stream)
-                        .expect("Failed to deserialize ConnectionRequest");
+                0x80..0x8d => {
+                    if !self.connections.contains_key(&peer_addr) {
+                        println!("Received packet from unconnected client: {}", peer_addr);
+                        continue;
+                    }
+                    let connection = self.connections.get_mut(&peer_addr).unwrap();
 
-					let response = ConnectionRequestAccepted {
-						time: std::time::SystemTime::now()
-						.duration_since(UNIX_EPOCH)
-						.unwrap(),
-						client_address: Address::from(&peer_addr),
-                        request_time: deserialized.timestamp,
-					};
-
-                    // TODO: Add Stablished connections to 
-                    
-                    /* let connection = RakNetConnection::new(peer_addr, &self.socket); */
-
-					let mut response_buf: BinaryStream = BinaryStream::new(None);
-                    response.serialize(&mut response_buf);
-                    self.socket
-                        .send_to(&response_buf.buffer, &peer_addr)
-                        .await
-                        .expect("Failed to send response");
-				}
-
-				0x80..0x8d => {
-                    FrameSetPacket::deserialize(&mut stream);
-                    println!("Unhandled packet ID: 0x{:02x}", packet_id);
-                   
+                    connection.handle_incoming(&mut stream, packet_id).await;
                 }
 
                 _ => {
@@ -150,16 +131,12 @@ impl <'a> RakNetServer <'a> {
         }
     }
 
-    pub async fn handle_unconnected_ping(&self, address: &SocketAddr) {
-        let response = UnconnectedPong {
-            id: self.pong.clone(),
-            timestamp: std::time::SystemTime::now()
-               .duration_since(UNIX_EPOCH)
-               .unwrap(),
-            server_guid: self.guid,
-        };
+    pub async fn send(&self, address: &SocketAddr, packet: impl Packet) {
         let mut stream = BinaryStream::new(None);
-        response.serialize(&mut stream);
-        self.socket.send_to(&stream.buffer, address).await.expect("Failed to send response");
+        packet.serialize(&mut stream);
+        self.socket
+            .send_to(&stream.buffer, address)
+            .await
+            .expect("Failed to send packet");
     }
 }
