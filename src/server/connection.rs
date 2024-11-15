@@ -38,7 +38,7 @@ impl<'a> RakNetConnection<'a> {
     }
 
 	async fn send_frame(&self, frame: Frame) -> Result<bool, Error> {
-		
+		Ok(true) // TODO: Implement frame queue
 	}
 
     pub async fn handle_incoming(&self, stream: &mut BinaryStream, packet_id: u8) {
