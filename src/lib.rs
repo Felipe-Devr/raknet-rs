@@ -1,8 +1,7 @@
 pub mod client;
-pub mod protocol;
 pub mod misc;
+pub mod protocol;
 pub mod server;
-mod tests;
 
 #[macro_export]
 macro_rules! export_modules {
