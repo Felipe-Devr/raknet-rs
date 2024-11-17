@@ -1,4 +1,4 @@
-use std::{fmt::Error, net::SocketAddr};
+use std::net::SocketAddr;
 
 use tokio::net::UdpSocket;
 
@@ -22,7 +22,7 @@ impl<'a> RakNetConnection<'a> {
         }
     }
 
-    pub async fn reply(&self, packet: &impl Packet) -> Result<bool, Error> {
+    pub async fn reply(&self, packet: &impl Packet) -> Result<bool, &str> {
         let mut stream: BinaryStream = BinaryStream::new(None);
         packet.serialize(&mut stream);
 
@@ -32,14 +32,14 @@ impl<'a> RakNetConnection<'a> {
             .await
             .is_err()
         {
-            Err::<bool, &str>("Failed to reply to connection.").unwrap();
+            return Err("Failed to send packet.");
         }
         Ok(true)
     }
 
-	async fn send_frame(&self, frame: Frame) -> Result<bool, Error> {
-		Ok(true) // TODO: Implement frame queue
-	}
+    pub async fn send_frame(&self, _frame: Frame) -> Result<bool, &str> {
+        todo!("Missing implementation on send_frame") // TODO: Implement frame queue
+    }
 
     pub async fn handle_incoming(&self, stream: &mut BinaryStream, packet_id: u8) {
         let connected_packet_id = packet_id & 0xf0;
@@ -63,6 +63,8 @@ impl<'a> RakNetConnection<'a> {
 
         match packet_id {
             ConnectionRequest::ID => {}
+
+            0x1 => {}
 
             _ => {}
         }

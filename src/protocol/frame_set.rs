@@ -58,8 +58,8 @@ impl Reliability {
 
 #[derive(Debug)]
 pub struct FrameSetPacket {
-	pub sequence: u32,
-    pub frames: Vec<Frame>,  // Assuming Frame is defined elsewhere
+    pub sequence: u32,
+    pub frames: Vec<Frame>, // Assuming Frame is defined elsewhere
 }
 
 impl Packet for FrameSetPacket {
@@ -73,20 +73,20 @@ impl Packet for FrameSetPacket {
 
         while !buffer.finished() {
             let frame = Frame::deserialize(buffer).unwrap();
-			frames.push(frame);
+            frames.push(frame);
         }
 
         Some(FrameSetPacket {
-			sequence: sequence.to_u32(),
-            frames,  // Assuming Frame is defined elsewhere
-		})
+            sequence: sequence.to_u32(),
+            frames, // Assuming Frame is defined elsewhere
+        })
     }
 
     fn serialize(&self, buffer: &mut BinaryStream) {
-		buffer.write_u24(u24::from_u32(self.sequence), Endianness::LittleEndian);
-		
-		for frame in &self.frames {
+        buffer.write_u24(u24::from_u32(self.sequence), Endianness::LittleEndian);
+
+        for frame in &self.frames {
             frame.serialize(buffer);
         }
-	}
+    }
 }

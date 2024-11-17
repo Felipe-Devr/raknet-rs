@@ -40,8 +40,7 @@ impl Packet for OpenReply1 {
 
         buffer.write_bool(self.use_security); // Write use security flag
         if self.use_security {
-            buffer
-                .write_i32(self.cookie.unwrap(), Endianness::BigEndian); // Write cookie
+            buffer.write_i32(self.cookie.unwrap(), Endianness::BigEndian); // Write cookie
         }
         buffer.write_u16(self.mtu, Endianness::BigEndian); // Write MTU
     }

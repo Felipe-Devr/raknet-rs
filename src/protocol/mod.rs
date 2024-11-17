@@ -1,5 +1,3 @@
-
-
 use crate::{export_modules, misc::BinaryStream};
 
 export_modules!(
@@ -9,7 +7,7 @@ export_modules!(
     open_request1,
     unconnected_pong,
     unconnected_ping,
-	disconnect,
+    disconnect,
     incompatible_protocol,
     connected,
     frame_set
